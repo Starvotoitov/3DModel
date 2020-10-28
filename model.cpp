@@ -10,6 +10,7 @@ Model::Model():
 	rotateYMatrix(IDENTITY_MATRIX),
 	rotateZMatrix(IDENTITY_MATRIX),
 	scaleMatrix(IDENTITY_MATRIX),
+	normalizeViewMatrix(IDENTITY_MATRIX),
 	viewMatrix(IDENTITY_MATRIX),
 	projectionMatrix(IDENTITY_MATRIX),
 	viewportMatrix(IDENTITY_MATRIX),
@@ -78,51 +79,28 @@ Model& Model::translate(float x, float y, float z)
 	parameters->setX(x);
 	parameters->setY(y);
 	parameters->setZ(z);
-	translateMatrix = {
-		1, 0, 0, x,
-		0, 1, 0, y,
-		0, 0, 1, z,
-		0, 0, 0, 1
-	};
+	translateMatrix = createTranslateMatrix(x, y, z);
 	return *this;
 }
 
 Model& Model::rotateX(float angle)
 {
 	parameters->setRotateAngleX(angle);
-	angle *= M_PI / 180;
-	rotateXMatrix = {
-		1,		 0,				   0,         0,
-		0, std::cos(angle), -std::sin(angle), 0,
-		0, std::sin(angle),  std::cos(angle), 0,
-		0,       0,                0,         1
-	};
+	rotateXMatrix = createRotateXMatrix(toRadian(angle));
 	return *this;
 }
 
 Model& Model::rotateY(float angle)
 {
 	parameters->setRotateAngleY(angle);
-	angle *= M_PI / 180;
-	rotateYMatrix = {
-		std::cos(angle), 0, std::sin(angle), 0,
-			  0,         1,       0,         0,
-	   -std::sin(angle), 0, std::cos(angle), 0,
-			  0,         0,       0,         1
-	};
+	rotateYMatrix = createRotateYMatrix(toRadian(angle));
 	return *this;
 }
 
 Model& Model::rotateZ(float angle)
 {
 	parameters->setRotateAngleZ(angle);
-	angle *= M_PI / 180;
-	rotateZMatrix = {
-		std::cos(angle), -std::sin(angle), 0, 0,
-		std::sin(angle),  std::cos(angle), 0, 0,
-			  0,                0,         1, 0,
-			  0,                0,         0, 1
-	};
+	rotateZMatrix = createRotateZMatrix(toRadian(angle));
 	return *this;
 }
 
@@ -149,12 +127,12 @@ void Model::resetModelMatrix()
 	scaleMatrix = IDENTITY_MATRIX;
 }
 
-Model& Model::changeCamera(const Camera &camera)
+Model& Model::setCamera(const std::shared_ptr<const Camera> camera)
 {
-	const QVector3D &xAxis = camera.getVectorX();
-	const QVector3D &yAxis = camera.getVectorY();
-	const QVector3D &zAxis = camera.getVectorZ();
-	const QVector3D &cameraPosition = camera.getPosition();
+	const QVector3D &xAxis = camera->getVectorX();
+	const QVector3D &yAxis = camera->getVectorY();
+	const QVector3D &zAxis = camera->getVectorZ();
+	const QVector3D &cameraPosition = camera->getPosition();
 
 	QMatrix4x4 coordinateSystemMatrix = {
 		xAxis.x(), xAxis.y(), xAxis.z(), 0,
@@ -171,6 +149,8 @@ Model& Model::changeCamera(const Camera &camera)
 	};
 
 	viewMatrix = coordinateSystemMatrix * cameraPositionMatrix;
+
+	this->camera = camera;
 
 	return *this;
 }
@@ -205,6 +185,8 @@ Model& Model::setPerspectiveProjectionMatrix(const Camera &camera)
 	parameters->setProjectionType(ProjectionType::Perspective);
 
 	float width = camera.getViewWidth();
+
+//	float width = camera.getViewWidth();
 	float height = camera.getViewHeight();
 	float near = camera.getNearViewingPlane();
 	float far = camera.getFarViewingPlane();
@@ -228,6 +210,8 @@ Model& Model::setViewportMatrix(float x, float y, float width, float height)
 	viewportMatrix = {
 		width / 2,      0,      0, x + width / 2,
 			0,     -height / 2, 0, y + height / 2,
+//			0,          0,       width / height, 0,
+//			0,          0,      0,       width / height
 			0,          0,      1,       0,
 			0,          0,      0,       1
 	};
@@ -241,20 +225,22 @@ void Model::resetViewportMatrix()
 
 void Model::translateCoordinates()
 {
+	updateNormalizeViewMatrix();
+
 	QMatrix4x4 resultTranslateMatrix =
-			projectionMatrix * viewMatrix * translateMatrix *
+			projectionMatrix * viewMatrix * normalizeViewMatrix * translateMatrix *
 			rotateXMatrix * rotateYMatrix * rotateZMatrix * scaleMatrix;
 
 	reset();
-	for (auto& currentVertex : transformedVertexList)
-	{
+	std::for_each(transformedVertexList.begin(), transformedVertexList.end(),
+	[this, &resultTranslateMatrix](Vertex& currentVertex){
 		currentVertex *= resultTranslateMatrix;
-		if (isPerspective)
+		if (this->isPerspective)
 		{
 			currentVertex.normalizeW();
 		}
-		currentVertex *= viewportMatrix;
-	}
+		currentVertex *= this->viewportMatrix;
+	});
 }
 
 void Model::reset()
@@ -275,4 +261,61 @@ std::vector<PolygonalFace> Model::getPolygons() const
 std::shared_ptr<const ModelParameters> Model::getParameters() const
 {
 	return parameters;
+}
+
+QMatrix4x4 Model::createTranslateMatrix(float x, float y, float z)
+{
+	return QMatrix4x4 {
+		1, 0, 0, x,
+		0, 1, 0, y,
+		0, 0, 1, z,
+		0, 0, 0, 1
+	};
+}
+
+QMatrix4x4 Model::createRotateXMatrix(float angle)
+{
+	return QMatrix4x4 {
+		1,		 0,				   0,         0,
+		0, std::cos(angle), -std::sin(angle), 0,
+		0, std::sin(angle),  std::cos(angle), 0,
+		0,       0,                0,         1
+	};
+}
+
+QMatrix4x4 Model::createRotateYMatrix(float angle)
+{
+	return QMatrix4x4 {
+		std::cos(angle), 0, std::sin(angle), 0,
+			  0,         1,       0,         0,
+	   -std::sin(angle), 0, std::cos(angle), 0,
+			  0,         0,       0,         1
+	};
+}
+
+QMatrix4x4 Model::createRotateZMatrix(float angle)
+{
+	return QMatrix4x4 {
+		std::cos(angle), -std::sin(angle), 0, 0,
+		std::sin(angle),  std::cos(angle), 0, 0,
+			  0,                0,         1, 0,
+			  0,                0,         0, 1
+	};
+}
+
+void Model::updateNormalizeViewMatrix()
+{
+	const QVector3D &cameraPosition = camera->getRealPosition();
+
+	normalizeViewMatrix =
+
+			createRotateXMatrix(-toRadian(camera->getAngleX())) *
+			createRotateYMatrix(-toRadian(camera->getAngleY())) *
+			createRotateZMatrix(-toRadian(camera->getAngleZ())) *
+			createTranslateMatrix(-cameraPosition.x(), -cameraPosition.y(), -cameraPosition.z());
+}
+
+float Model::toRadian(float angle)
+{
+	return angle * M_PI / 180;
 }

@@ -1,22 +1,29 @@
 #include "space3d.h"
 
 Space3D::Space3D():
+	viewCamera(nullptr),
+	currentModel(nullptr)
+{
+}
+
+Space3D::Space3D(std::shared_ptr<const Camera> camera):
+	viewCamera(camera),
 	currentModel(nullptr)
 {
 }
 
 void Space3D::addNewModel(const std::shared_ptr<Model> &newModel)
 {
-	newModel->setPerspectiveProjectionMatrix(viewCamera);
-	newModel->changeCamera(viewCamera);
+	newModel->setPerspectiveProjectionMatrix(*viewCamera);
+	newModel->setCamera(viewCamera);
 	modelList.push_back(newModel);
 	currentModel = newModel;
 }
 
 void Space3D::addNewModel(std::shared_ptr<Model> &&newModel)
 {
-	newModel->setPerspectiveProjectionMatrix(viewCamera);
-	newModel->changeCamera(viewCamera);
+	newModel->setPerspectiveProjectionMatrix(*viewCamera);
+	newModel->setCamera(viewCamera);
 	modelList.push_back(std::forward<std::shared_ptr<Model>>(newModel));
 	currentModel = newModel;
 }
@@ -27,55 +34,6 @@ void Space3D::recalculateCoordinates()
 	{
 		currentModel->translateCoordinates();
 	}
-}
-
-void Space3D::updateCameraPosition()
-{
-	viewCamera.updateCoordinates();
-	for (auto& currentModel : modelList)
-	{
-		currentModel->changeCamera(viewCamera);
-	}
-}
-
-void Space3D::changeCameraUpwardMovement()
-{
-	viewCamera.changeUpwardMovement();
-}
-
-void Space3D::changeCameraDownwardMovement()
-{
-	viewCamera.changeDownwardMovement();
-}
-
-void Space3D::changeCameraForwardMovement()
-{
-	viewCamera.changeForwardMovement();
-}
-
-void Space3D::changeCameraBackwardMovement()
-{
-	viewCamera.changeBackwardMovement();
-}
-
-void Space3D::changeCameraMovementToLeft()
-{
-	viewCamera.changeMovementToLeft();
-}
-
-void Space3D::changeCameraMovementToRight()
-{
-	viewCamera.changeMovementToRight();
-}
-
-void Space3D::changeRotationToLeft()
-{
-	viewCamera.changeRotationToLeft();
-}
-
-void Space3D::changeRotationToRight()
-{
-	viewCamera.changeRotationToRight();
 }
 
 void Space3D::translate(float x, float y, float z)
@@ -122,7 +80,7 @@ void Space3D::setOrthographicProjection()
 {
 	if (currentModel != nullptr)
 	{
-		currentModel->setOrthographicProjectionMatrix(viewCamera);
+		currentModel->setOrthographicProjectionMatrix(*viewCamera);
 	}
 }
 
@@ -130,7 +88,7 @@ void Space3D::setPerspectiveProjection()
 {
 	if (currentModel != nullptr)
 	{
-		currentModel->setPerspectiveProjectionMatrix(viewCamera);
+		currentModel->setPerspectiveProjectionMatrix(*viewCamera);
 	}
 }
 

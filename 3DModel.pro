@@ -17,6 +17,7 @@ DEFINES += QT_DEPRECATED_WARNINGS
 
 SOURCES += \
     camera.cpp \
+    cameramovementcontroller.cpp \
     doubleslider.cpp \
     main.cpp \
     mainwindow.cpp \
@@ -35,6 +36,7 @@ SOURCES += \
 
 HEADERS += \
     camera.h \
+    cameramovementcontroller.h \
     doubleslider.h \
     mainwindow.h \
     model.h \

@@ -8,6 +8,7 @@
 #include "camera.h"
 #include "modelparameters.h"
 #include <vector>
+#include <memory>
 
 class Model
 {
@@ -31,7 +32,7 @@ public:
 	Model& scale(float x, float y, float z);
 	void resetModelMatrix();
 
-	Model& changeCamera(const Camera& camera);
+	Model& setCamera(const std::shared_ptr<const Camera> camera);
 	void resetViewMatrix();
 
 	Model& setOrthographicProjectionMatrix(const Camera& camera);
@@ -50,6 +51,8 @@ public:
 	std::shared_ptr<const ModelParameters> getParameters() const;
 
 private:
+	std::shared_ptr<const Camera> camera;
+
 	std::vector<Vertex> originalVertexList;
 	std::vector<TextureCoordinates> textureCoordinatesList;
 	std::vector<VertexNormal> vertexNormalList;
@@ -62,6 +65,7 @@ private:
 	QMatrix4x4 rotateYMatrix;
 	QMatrix4x4 rotateZMatrix;
 	QMatrix4x4 scaleMatrix;
+	QMatrix4x4 normalizeViewMatrix;
 	QMatrix4x4 viewMatrix;
 	QMatrix4x4 projectionMatrix;
 	QMatrix4x4 viewportMatrix;
@@ -70,12 +74,23 @@ private:
 
 	std::shared_ptr<ModelParameters> parameters;
 
+	float curWidth;
+	float curHeight;
+
 	inline static QMatrix4x4 IDENTITY_MATRIX = {
 		1, 0, 0, 0,
 		0, 1, 0, 0,
 		0, 0, 1, 0,
 		0, 0, 0, 1
 	};
+
+	static QMatrix4x4 createTranslateMatrix(float x, float y, float z);
+	static QMatrix4x4 createRotateXMatrix(float angle);
+	static QMatrix4x4 createRotateYMatrix(float angle);
+	static QMatrix4x4 createRotateZMatrix(float angle);
+	static float toRadian(float angle);
+
+	void updateNormalizeViewMatrix();
 };
 
 #endif // MODEL_H

@@ -2,6 +2,7 @@
 #define MODELVIEWER_H
 
 #include "space3d.h"
+#include "cameramovementcontroller.h"
 #include "projectiontype.h"
 #include <QWidget>
 #include <QPainter>
@@ -10,10 +11,7 @@
 #include <QTimer>
 #include <map>
 
-#include <QTabWidget>
-
 class ModelViewer : public QWidget
-//class ModelViewer : public QTabWidget
 {
 	Q_OBJECT
 public:
@@ -38,19 +36,23 @@ private:
 
 	using InputHandler = void (ModelViewer::*)();
 
+	CameraMovementController cameraController;
 	Space3D space;
 	std::map<Qt::Key, InputHandler> handlers;
 	QTimer tickTimer;
+
+	QPointF lastCursorPosition;
 
 	void drawLine(QPointF start, QPointF end, QPainter &painter);
 	void render(QPainter& painter);
 	void paintEvent(QPaintEvent *event) override;
 	void keyPressEvent(QKeyEvent *event) override;
 	void keyReleaseEvent(QKeyEvent *event) override;
-	void mousePressEvent(QMouseEvent *event) override;
 	void mouseMoveEvent(QMouseEvent *event) override;
 	void mouseDoubleClickEvent(QMouseEvent *event) override;
 	void resizeEvent(QResizeEvent *event) override;
+	void focusInEvent(QFocusEvent *event) override;
+	void focusOutEvent(QFocusEvent *event) override;
 
 	void moveUpwardHandler();
 	void moveDownwardHandler();
@@ -60,6 +62,7 @@ private:
 	void moveToRightHandler();
 	void rotateToLeftHandler();
 	void rotateToRightHandler();
+	void removeFocusHandler();
 
 private slots:
 	void tickHandler();

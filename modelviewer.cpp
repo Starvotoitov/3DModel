@@ -1,9 +1,11 @@
 #include "modelviewer.h"
 #include <iterator>
 #include <cmath>
+#include <QCursor>
 
 ModelViewer::ModelViewer(QWidget *parent):
 	QWidget(parent),
+	space(cameraController.getCamera()),
 	tickTimer(this)
 {
 	handlers[Qt::Key_Space] = &ModelViewer::moveUpwardHandler;
@@ -14,6 +16,7 @@ ModelViewer::ModelViewer(QWidget *parent):
 	handlers[Qt::Key_D] = &ModelViewer::moveToRightHandler;
 	handlers[Qt::Key_Q] = &ModelViewer::rotateToLeftHandler;
 	handlers[Qt::Key_E] = &ModelViewer::rotateToRightHandler;
+	handlers[Qt::Key_Escape] = &ModelViewer::removeFocusHandler;
 
 	connect(&tickTimer, &QTimer::timeout, this, &ModelViewer::tickHandler);
 	tickTimer.start(TIMER_TICK_TIME);
@@ -157,69 +160,96 @@ void ModelViewer::keyReleaseEvent(QKeyEvent *event)
 		(this->*handler)();
 	}
 }
-
-void ModelViewer::mousePressEvent(QMouseEvent *event)
-{
-
-}
-
+#include <iostream>
 void ModelViewer::mouseMoveEvent(QMouseEvent *event)
 {
+	QCursor::setPos(lastCursorPosition.x(), lastCursorPosition.y());
 
+	float changeXAngle = event->globalY() - lastCursorPosition.y();
+	if (changeXAngle != 0)
+	{
+		cameraController.changeXAngle(-changeXAngle);
+	}
+
+	float changeYAngle = event->globalX() - lastCursorPosition.x();
+	if (changeYAngle != 0)
+	{
+		cameraController.changeYAngle(-changeYAngle);
+	}
 }
 
 void ModelViewer::mouseDoubleClickEvent(QMouseEvent *event)
 {
-
+	Q_UNUSED(event);
+	setFocus();
+	lastCursorPosition = QPointF(window()->x() + x() + width() / 2, window()->y() + y() + height() / 2);
 }
 
 void ModelViewer::resizeEvent(QResizeEvent *event)
 {
-	space.updateViewport(0, 0, width(), height());
+//	space.updateViewport(0, 0, width(), height());
+}
+
+void ModelViewer::focusInEvent(QFocusEvent *event)
+{
+	Q_UNUSED(event);
+	setMouseTracking(true);
+	setCursor(Qt::BlankCursor);
+}
+
+void ModelViewer::focusOutEvent(QFocusEvent *event)
+{
+	Q_UNUSED(event);
+	setMouseTracking(false);
+	setCursor(Qt::ArrowCursor);
 }
 
 void ModelViewer::moveUpwardHandler()
 {
-	space.changeCameraUpwardMovement();
+	cameraController.changeYPosition(0.1);
 }
 
 void ModelViewer::moveDownwardHandler()
 {
-	space.changeCameraDownwardMovement();
+	cameraController.changeYPosition(-0.1);
 }
 
 void ModelViewer::moveForwardHandler()
 {
-	space.changeCameraForwardMovement();
+	cameraController.changeZPosition(-0.1);
 }
 
 void ModelViewer::moveBackwardHandler()
 {
-	space.changeCameraBackwardMovement();
+	cameraController.changeZPosition(0.1);
 }
 
 void ModelViewer::moveToLeftHandler()
 {
-	space.changeCameraMovementToLeft();
+	cameraController.changeXPosition(-0.1);
 }
 
 void ModelViewer::moveToRightHandler()
 {
-	space.changeCameraMovementToRight();
+	cameraController.changeXPosition(0.1);
 }
 
 void ModelViewer::rotateToLeftHandler()
 {
-	space.changeRotationToLeft();
+	cameraController.changeZAngle(1);
 }
 
 void ModelViewer::rotateToRightHandler()
 {
-	space.changeRotationToRight();
+	cameraController.changeZAngle(-1);
+}
+
+void ModelViewer::removeFocusHandler()
+{
+	clearFocus();
 }
 
 void ModelViewer::tickHandler()
 {
-	space.updateCameraPosition();
 	update();
 }

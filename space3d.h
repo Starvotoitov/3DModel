@@ -9,21 +9,12 @@ class Space3D
 {
 public:
 	Space3D();
+	Space3D(std::shared_ptr<const Camera> camera);
 
 	void addNewModel(const std::shared_ptr<Model>& newModel);
 	void addNewModel(std::shared_ptr<Model>&& newModel);
 
 	void recalculateCoordinates();
-	void updateCameraPosition();
-
-	void changeCameraUpwardMovement();
-	void changeCameraDownwardMovement();
-	void changeCameraForwardMovement();
-	void changeCameraBackwardMovement();
-	void changeCameraMovementToLeft();
-	void changeCameraMovementToRight();
-	void changeRotationToLeft();
-	void changeRotationToRight();
 
 	void translate(float x, float y, float z);
 	void rotateX(float x);
@@ -43,7 +34,7 @@ public:
 	std::vector<std::shared_ptr<Model>>::const_iterator begin() const;
 	std::vector<std::shared_ptr<Model>>::const_iterator end() const;
 private:
-	Camera viewCamera;
+	std::shared_ptr<const Camera> viewCamera;
 	std::shared_ptr<Model> currentModel;
 	std::vector<std::shared_ptr<Model>> modelList;
 };
