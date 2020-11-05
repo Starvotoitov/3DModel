@@ -1,23 +1,16 @@
 #include "camera.h"
+#include "matrixarithmetic.h"
 
 Camera::Camera():
 	position(DEFAULT_POSITION),
 	realPosition(DEFAULT_REAL_POSITION),
 	angleX(DEFAULT_ANGLE),
 	angleY(DEFAULT_ANGLE),
-	angleZ(DEFAULT_ANGLE)
-{	
-	vectorX = QVector3D(1, 0, 0);
-	vectorY = QVector3D(0, 1, 0);
-	vectorZ = QVector3D(0, 0, 1);
-
-//	vectorZ = position - QVector3D(0, 0, 0);
-//	vectorZ.normalize();
-
-//	vectorY = QVector3D(0, 1, 0);
-
-//	vectorX = QVector3D::crossProduct(vectorY, vectorZ);
-//	vectorX.normalize();
+	angleZ(DEFAULT_ANGLE),
+	vectorX(VECTOR_X),
+	vectorY(VECTOR_Y),
+	vectorZ(VECTOR_Z)
+{
 }
 
 const QVector3D& Camera::getVectorX() const
@@ -62,17 +55,41 @@ float Camera::getAngleZ() const
 
 void Camera::changeXPosition(float changeVal)
 {
-	realPosition[X_INDEX] += changeVal;
+	QVector3D directionVector =
+		MatrixArithmetic::rotateYMatrix(MatrixArithmetic::toRadian(angleY)) *
+		MatrixArithmetic::rotateZMatrix(MatrixArithmetic::toRadian(angleZ)) *
+		VECTOR_X *
+		changeVal;
+
+	realPosition[X_INDEX] += directionVector.x();
+	realPosition[Y_INDEX] += directionVector.y();
+	realPosition[Z_INDEX] += directionVector.z();
 }
 
 void Camera::changeYPosition(float changeVal)
 {
-	realPosition[Y_INDEX] += changeVal;
+	QVector3D directionVector =
+		MatrixArithmetic::rotateXMatrix(MatrixArithmetic::toRadian(angleX)) *
+		MatrixArithmetic::rotateZMatrix(MatrixArithmetic::toRadian(angleZ)) *
+		VECTOR_Y *
+		changeVal;
+
+	realPosition[X_INDEX] += directionVector.x();
+	realPosition[Y_INDEX] += directionVector.y();
+	realPosition[Z_INDEX] += directionVector.z();
 }
 
 void Camera::changeZPosition(float changeVal)
 {
-	realPosition[Z_INDEX] += changeVal;
+	QVector3D directionVector =
+		MatrixArithmetic::rotateXMatrix(MatrixArithmetic::toRadian(angleX)) *
+		MatrixArithmetic::rotateYMatrix(MatrixArithmetic::toRadian(angleY)) *
+		VECTOR_Z *
+		changeVal;
+
+	realPosition[X_INDEX] += directionVector.x();
+	realPosition[Y_INDEX] += directionVector.y();
+	realPosition[Z_INDEX] += directionVector.z();
 }
 
 void Camera::changeXAngle(float changeVal)

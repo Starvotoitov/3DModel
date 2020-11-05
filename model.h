@@ -77,19 +77,6 @@ private:
 	float curWidth;
 	float curHeight;
 
-	inline static QMatrix4x4 IDENTITY_MATRIX = {
-		1, 0, 0, 0,
-		0, 1, 0, 0,
-		0, 0, 1, 0,
-		0, 0, 0, 1
-	};
-
-	static QMatrix4x4 createTranslateMatrix(float x, float y, float z);
-	static QMatrix4x4 createRotateXMatrix(float angle);
-	static QMatrix4x4 createRotateYMatrix(float angle);
-	static QMatrix4x4 createRotateZMatrix(float angle);
-	static float toRadian(float angle);
-
 	void updateNormalizeViewMatrix();
 };
 

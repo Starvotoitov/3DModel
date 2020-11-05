@@ -4,12 +4,13 @@
 #include "space3d.h"
 #include "cameramovementcontroller.h"
 #include "projectiontype.h"
+#include "zbuffer.h"
 #include <QWidget>
 #include <QPainter>
 #include <QKeyEvent>
 #include <QMouseEvent>
-#include <QTimer>
 #include <map>
+#include <QImage>
 
 class ModelViewer : public QWidget
 {
@@ -32,18 +33,17 @@ signals:
 	void newModelChosed(std::shared_ptr<const ModelParameters> newModel);
 
 private:
-	inline static int TIMER_TICK_TIME = 20;
-
 	using InputHandler = void (ModelViewer::*)();
 
 	CameraMovementController cameraController;
 	Space3D space;
+	ZBuffer zBuffer;
 	std::map<Qt::Key, InputHandler> handlers;
-	QTimer tickTimer;
 
 	QPointF lastCursorPosition;
 
-	void drawLine(QPointF start, QPointF end, QPainter &painter);
+	void drawLine(QPointF start, QPointF end, QImage& canvas);
+	void drawPoint(const QPoint& point, QImage& canvas, const QColor& color);
 	void render(QPainter& painter);
 	void paintEvent(QPaintEvent *event) override;
 	void keyPressEvent(QKeyEvent *event) override;
@@ -63,9 +63,6 @@ private:
 	void rotateToLeftHandler();
 	void rotateToRightHandler();
 	void removeFocusHandler();
-
-private slots:
-	void tickHandler();
 };
 
 #endif // MODELVIEWER_H

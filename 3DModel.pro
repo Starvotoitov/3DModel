@@ -21,6 +21,7 @@ SOURCES += \
     doubleslider.cpp \
     main.cpp \
     mainwindow.cpp \
+    matrixarithmetic.cpp \
     model.cpp \
     modeladder.cpp \
     modelchooser.cpp \
@@ -32,13 +33,15 @@ SOURCES += \
     space3d.cpp \
     texturecoordinates.cpp \
     vertex.cpp \
-    vertexnormal.cpp
+    vertexnormal.cpp \
+    zbuffer.cpp
 
 HEADERS += \
     camera.h \
     cameramovementcontroller.h \
     doubleslider.h \
     mainwindow.h \
+    matrixarithmetic.h \
     model.h \
     modeladder.h \
     modelchooser.h \
@@ -52,7 +55,8 @@ HEADERS += \
     space3d.h \
     texturecoordinates.h \
     vertex.h \
-    vertexnormal.h
+    vertexnormal.h \
+    zbuffer.h
 
 FORMS += \
     mainwindow.ui
