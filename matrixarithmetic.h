@@ -9,6 +9,8 @@ namespace MatrixArithmetic
 
 float toRadian(float angle);
 
+QMatrix4x4 identityMatrix();
+
 QMatrix4x4 translateMatrix(float x, float y, float z);
 
 QMatrix4x4 rotateXMatrix(float angle);

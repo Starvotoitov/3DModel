@@ -11,12 +11,12 @@ float toRadian(float angle)
 
 QMatrix4x4 identityMatrix()
 {
-	return QMatrix4x4 {
+	return QMatrix4x4 ({
 		1, 0, 0, 0,
 		0, 1, 0, 0,
 		0, 0, 1, 0,
 		0, 0, 0, 1
-	};
+	});
 }
 
 QMatrix4x4 translateMatrix(float x, float y, float z)
@@ -103,6 +103,13 @@ QMatrix4x4 orthographicMatrix(float width, float height,
 QMatrix4x4 perspectiveMatrix(float width, float height,
 							 float near, float far)
 {
+/*	const float FOV = M_PI / 2;
+	return QMatrix4x4 {
+		1 / (width / height) * std::tan(FOV / 2),           0,                    0,                      0,
+						 0,                       1 / std::tan(FOV / 2),          0,                      0,
+						 0,                                 0,           far / (near - far), (near * far) / (near - far),
+						 0,                                 0,                   -1,                      0
+	}; */
 	return QMatrix4x4 {
 		2 * near / width,            0,                       0,                      0,
 			  0,             2 * near / height,               0,                      0,

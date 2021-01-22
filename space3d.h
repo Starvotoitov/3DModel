@@ -25,11 +25,14 @@ public:
 	void setOrthographicProjection();
 	void setPerspectiveProjection();
 
-	void updateViewport(float x, float y, float width, float height);
+//	void updateViewport(float x, float y, float width, float height);
+	void resize(float width, float height);
 
 	bool setCurrentModel(int index);
 	void deleteCurrentModel();
 	std::shared_ptr<const ModelParameters> getCurrentModelParameters() const;
+	QVector3D getCameraDirection() const;
+	QVector3D getRealCamera() const;
 
 	std::vector<std::shared_ptr<Model>>::const_iterator begin() const;
 	std::vector<std::shared_ptr<Model>>::const_iterator end() const;

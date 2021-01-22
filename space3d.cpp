@@ -16,6 +16,7 @@ void Space3D::addNewModel(const std::shared_ptr<Model> &newModel)
 {
 	newModel->setPerspectiveProjectionMatrix(*viewCamera);
 	newModel->setCamera(viewCamera);
+	newModel->setViewportMatrix(0, 0);
 	modelList.push_back(newModel);
 	currentModel = newModel;
 }
@@ -24,6 +25,7 @@ void Space3D::addNewModel(std::shared_ptr<Model> &&newModel)
 {
 	newModel->setPerspectiveProjectionMatrix(*viewCamera);
 	newModel->setCamera(viewCamera);
+	newModel->setViewportMatrix(0, 0);
 	modelList.push_back(std::forward<std::shared_ptr<Model>>(newModel));
 	currentModel = newModel;
 }
@@ -91,12 +93,22 @@ void Space3D::setPerspectiveProjection()
 		currentModel->setPerspectiveProjectionMatrix(*viewCamera);
 	}
 }
-
+/*
 void Space3D::updateViewport(float x, float y, float width, float height)
 {
 	for (auto &currentModel : modelList)
 	{
 		currentModel->setViewportMatrix(x, y, width, height);
+	}
+}*/
+
+void Space3D::resize(float width, float height)
+{
+	for (auto &currentModel : modelList)
+	{
+		currentModel->resize(width, height);
+		currentModel->setPerspectiveProjectionMatrix(*viewCamera);
+		currentModel->setViewportMatrix(0, 0);
 	}
 }
 
@@ -123,6 +135,16 @@ void Space3D::deleteCurrentModel()
 std::shared_ptr<const ModelParameters> Space3D::getCurrentModelParameters() const
 {
 	return currentModel->getParameters();
+}
+
+QVector3D Space3D::getCameraDirection() const
+{
+	return QVector3D(0, 0, 0) - viewCamera->getVectorZ();
+}
+
+QVector3D Space3D::getRealCamera() const
+{
+	return viewCamera->getRealPosition();
 }
 
 std::vector<std::shared_ptr<Model>>::const_iterator Space3D::begin() const

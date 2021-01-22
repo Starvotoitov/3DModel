@@ -1,6 +1,7 @@
 #ifndef VERTEX_H
 #define VERTEX_H
 
+#include <QVector3D>
 #include <QVector4D>
 #include <QMatrix4x4>
 
@@ -10,7 +11,8 @@ public:
 	Vertex() = default;
 	Vertex(double x, double y, double z, double w = DEFAULT_VALUE);
 
-	QVector4D toVector() const;
+	QVector4D toVector4D() const;
+	QVector3D toVector3D() const;
 	void fromVector(QVector4D& vector);
 	int getX() const;
 	int getY() const;

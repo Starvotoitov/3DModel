@@ -43,7 +43,7 @@ private:
 	float angleZ;
 
 	inline static QVector3D DEFAULT_POSITION = QVector3D(0, 0, 0);
-	inline static QVector3D DEFAULT_REAL_POSITION = QVector3D(0, 0, 2);
+	inline static QVector3D DEFAULT_REAL_POSITION = QVector3D(0, 0, 10);
 	inline static QVector3D VECTOR_X = QVector3D(1, 0, 0);
 	inline static QVector3D VECTOR_Y = QVector3D(0, 1, 0);
 	inline static QVector3D VECTOR_Z = QVector3D(0, 0, 1);

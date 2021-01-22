@@ -24,7 +24,8 @@ ModelViewer::ModelViewer(QWidget *parent):
 
 void ModelViewer::addNewModel(std::shared_ptr<Model> newModel)
 {
-	newModel->setViewportMatrix(0, 0, width(), height());
+	newModel->resize(width(), height());
+//	newModel->setViewportMatrix(0, 0, width(), height());
 	space.addNewModel(newModel);
 	emit newModelChosed(newModel->getParameters());
 }
@@ -79,77 +80,169 @@ void ModelViewer::setProjectionType(ProjectionType newType)
 	}
 }
 
-void ModelViewer::drawLine(QPointF start, QPointF end, QImage& canvas)
+void ModelViewer::drawTriangle(PolygonTriangle triangle, QImage &canvas, const QVector3D& light, const QVector3D& camera,
+							   const QImage& normalMap, const QImage& specularMap, const QImage& albedoMap)
 {
-	float L = std::abs(end.x() - start.x()) > std::abs(end.y() - start.y()) ?
-				std::abs(end.x() - start.x()) :
-				std::abs(end.y() - start.y());
+	if (triangle.v1.y() > triangle.v2.y())
+	{
+		std::swap(triangle.v1, triangle.v2);
+		std::swap(triangle.vn1, triangle.vn2);
+		std::swap(triangle.world1, triangle.world2);
+	}
+	if (triangle.v1.y() > triangle.v3.y())
+	{
+		std::swap(triangle.v1, triangle.v3);
+		std::swap(triangle.vn1, triangle.vn3);
+		std::swap(triangle.world1, triangle.world3);
+	}
+	if (triangle.v2.y() > triangle.v3.y())
+	{
+		std::swap(triangle.v2, triangle.v3);
+		std::swap(triangle.vn2, triangle.vn3);
+		std::swap(triangle.world2, triangle.world3);
+	}
+
+	auto startY = std::ceil(triangle.v1.y());
+	auto endY = std::ceil(triangle.v2.y());
+	for (auto y = startY; y < endY; ++y)
+	{
+		auto [xa, xb, za, zb] = calculateFirstHalfInterpolation(
+				triangle, y);
+
+		auto [normalStart, normalEnd] = calculateFirstHalfNormalInterpolation(
+				triangle, y);
+
+		auto [worldStart, worldEnd] = calculateFirstHalfWorldInterpolation(
+				triangle, y);
+
+		QVector3D start(xa, y, za);
+		QVector3D end(xb, y, zb);
+		drawLine(start, end, normalStart, normalEnd, worldStart, worldEnd, canvas, light, camera,
+				normalMap, specularMap, albedoMap);
+	}
+
+	startY = std::ceil(triangle.v2.y());
+	endY = std::ceil(triangle.v3.y());
+	for (auto y = startY; y < endY; ++y)
+	{
+		auto [xa, xb, za, zb] = calculateSecondHalfInterpolation(
+				triangle, y);
+
+		auto [normalStart, normalEnd] = calculateSecondHalfNormalInterpolation(
+				triangle, y);
+
+		auto [worldStart, worldEnd] = calculateSecondHalfWorldInterpolation(
+				triangle, y);
+
+		QVector3D start(xa, y, za);
+		QVector3D end(xb, y, zb);
+		drawLine(start, end, normalStart, normalEnd, worldStart, worldEnd, canvas, light, camera,
+				normalMap, specularMap, albedoMap);
+	}
+}
+
+void ModelViewer::drawLine(const QVector3D& start, const QVector3D& end,
+				const QVector3D& normalStart, const QVector3D& normalEnd,
+				const QVector3D& worldStart, const QVector3D& worldEnd,
+				QImage& canvas, const QVector3D& light, const QVector3D& camera,
+				const QImage& normalMap, const QImage& specularMap, const QImage& albedoMap)
+{
+	if (!canvas.valid(start.x(), start.y()) || !canvas.valid(end.x(), end.y()))
+	{
+		return;
+	}
+
+	auto L = std::abs(std::ceil(end.x()) - std::ceil(start.x()));
+
 	if (L != 0)
 	{
-		float x = start.x();
-		float y = start.y();
-		float deltaX = (end.x() - start.x()) / L;
-		float deltaY = (end.y() - start.y()) / L;
+		auto x = (std::min(start.x(), end.x()));
+		auto y = start.y();
 		for (int i = 0; i < L; ++i)
 		{
-			drawPoint(QPoint(x, y), canvas, QColor(Qt::white));
-			x += deltaX;
-			y += deltaY;
+			float depth = start.z() + (end.z() - start.z()) *
+					((x - start.x()) / (end.x() - start.x()));
+
+			auto normal = normalStart + (x - start.x()) *
+					(normalEnd - normalStart) / (end.x() - start.x());
+
+			auto world = worldStart + (x - start.x()) *
+					(worldEnd - worldStart) / (end.x() - start.x());
+
+			normal.normalize();
+			auto lightVector = light - world;
+			lightVector.normalize();
+
+			auto intensity = QVector3D::dotProduct(normal, lightVector);
+			if (intensity < 0)
+			{
+				intensity = 0;
+			}
+
+			auto reflectionVector = -lightVector - 2 * QVector3D::dotProduct(-lightVector, normal) * normal;
+			reflectionVector.normalize();
+			auto viewVector = camera - world;
+			viewVector.normalize();
+			auto reflection = std::pow(std::max(0.0f, QVector3D::dotProduct(reflectionVector, viewVector)), 4);
+
+			auto red = ((0.2 + intensity) * MODEL_COLOR.red() + reflection * REFLECTION_LIGHT.red()) *
+					LIGHT_COLOR.red() / 255;
+			if (red > 255) red = 255;
+			auto green = ((0.2 + intensity) * MODEL_COLOR.green() + reflection * REFLECTION_LIGHT.green()) *
+					LIGHT_COLOR.green() / 255;
+			if (green > 255) green = 255;
+			auto blue = ((0.2 + intensity) * MODEL_COLOR.blue() + reflection * REFLECTION_LIGHT.blue()) *
+					LIGHT_COLOR.blue() / 255;
+			if (blue > 255) blue = 255;
+
+			QColor color(red, green, blue);
+
+			if (zBuffer.checkAndSet(x, y, depth))
+			{
+				drawPoint(QPoint(x, y), canvas, color);
+			}
+			x += 1;
 		}
 	}
 }
 
 void ModelViewer::drawPoint(const QPoint& point, QImage &canvas, const QColor& color)
 {
-	if (point.x() < canvas.width() && point.x() > -1 &&
-			point.y() < canvas.height() && point.y() > -1)
-	{
-		auto pixels = (QRgb*)canvas.bits();
-		pixels[point.x() + point.y() * canvas.width()] = color.rgb();
-	}
+	auto pixels = (QRgb*)canvas.bits();
+	pixels[point.x() + point.y() * canvas.width()] = color.rgb();
 }
 
 void ModelViewer::render(QPainter& painter)
 {
+//	qDebug() << space.getRealCamera();
 	QElapsedTimer timer;
 	timer.start();
 	space.recalculateCoordinates();
-	qDebug() << "Recalculation: " << timer.elapsed();
+//	qDebug() << "Recalculation: " << timer.elapsed();
 
 	timer.start();
 	zBuffer.clear();
 	QImage image(width(), height(), QImage::Format_RGB32);
+	image.fill(QColor(255, 255, 255));
+
+	static int i;
 	for (const auto& currentModel : space)
 	{
+		i = 1;
 		auto polygons = currentModel->getPolygons();
-		auto vertexes = currentModel->getVertexes();
-		for (const auto& currentPolygon : polygons)
-		{
-			auto polygonVertexList = currentPolygon.getPolygonVertexList();
-
-			auto fromVertex = polygonVertexList.begin();
-			auto toVertex = fromVertex;
-			do
+		auto normalMap = currentModel->getNormalMap();
+		auto specularMap = currentModel->getSpecularMap();
+		auto albedoMap = currentModel->getAlbedoMap();
+		std::for_each(polygons.begin(), polygons.end(), [this, &image, normalMap, specularMap, albedoMap](const PolygonTriangle& currentPolygon){
+			if (currentPolygon.isVisible)
 			{
-				fromVertex = toVertex;
-				toVertex = std::next(fromVertex);
-				if (toVertex == polygonVertexList.end())
-				{
-					toVertex = polygonVertexList.begin();
-				}
-
-				int fromIndex = (*fromVertex).vertexIndex;
-				int toIndex = (*toVertex).vertexIndex;
-
-				drawLine(QPoint(vertexes[fromIndex - 1].getX(), vertexes[fromIndex - 1].getY()),
-						QPoint(vertexes[toIndex - 1].getX(), vertexes[toIndex - 1].getY()),
-						image);
+				drawTriangle(currentPolygon, image, QVector3D(0, 0, 5), space.getRealCamera(),
+							 normalMap, specularMap, albedoMap);
 			}
-			while (toVertex != polygonVertexList.begin());
-		}
+		});
 	}
 	painter.drawImage(0, 0, image);
-	qDebug() << "Drawing: " << timer.elapsed();
+//	qDebug() << "Drawing: " << timer.elapsed();
 
 }
 
@@ -184,13 +277,13 @@ void ModelViewer::mouseMoveEvent(QMouseEvent *event)
 {
 	QCursor::setPos(lastCursorPosition.x(), lastCursorPosition.y());
 
-	float changeXAngle = event->globalY() - lastCursorPosition.y();
+	float changeXAngle = (event->globalY() - lastCursorPosition.y());
 	if (changeXAngle != 0)
 	{
 		cameraController.changeXAngle(-changeXAngle);
 	}
 
-	float changeYAngle = event->globalX() - lastCursorPosition.x();
+	float changeYAngle = (event->globalX() - lastCursorPosition.x());
 	if (changeYAngle != 0)
 	{
 		cameraController.changeYAngle(-changeYAngle);
@@ -207,6 +300,8 @@ void ModelViewer::mouseDoubleClickEvent(QMouseEvent *event)
 
 void ModelViewer::resizeEvent(QResizeEvent *event)
 {
+//	zBuffer.resize(width(), height());
+	space.resize(width(), height());
 	zBuffer.resize(width(), height());
 }
 
@@ -277,4 +372,111 @@ void ModelViewer::rotateToRightHandler()
 void ModelViewer::removeFocusHandler()
 {
 	clearFocus();
+}
+
+std::tuple<float, float, float, float> ModelViewer::calculateFirstHalfInterpolation(
+		PolygonTriangle &triangle, int y)
+{
+	auto multiplierA = (y - triangle.v1.y()) / (triangle.v2.y() - triangle.v1.y());
+	auto multiplierB = (y - triangle.v1.y()) / (triangle.v3.y() - triangle.v1.y());
+	return std::tuple{
+		triangle.v1.x() + (triangle.v2.x() - triangle.v1.x()) * multiplierA,
+		triangle.v1.x() + (triangle.v3.x() - triangle.v1.x()) * multiplierB,
+		triangle.v1.z() + (triangle.v2.z() - triangle.v1.z()) * multiplierA,
+		triangle.v1.z() + (triangle.v3.z() - triangle.v1.z()) * multiplierB
+	};
+}
+
+std::tuple<float, float, float, float> ModelViewer::calculateSecondHalfInterpolation(
+		PolygonTriangle &triangle, int y)
+{
+	return std::tuple{
+		triangle.v2.x() + (triangle.v3.x() - triangle.v2.x()) *
+				((y - triangle.v2.y()) / (triangle.v3.y() - triangle.v2.y())),
+		triangle.v1.x() + (triangle.v3.x() - triangle.v1.x()) *
+				((y - triangle.v1.y()) / (triangle.v3.y() - triangle.v1.y())),
+		triangle.v2.z() + (triangle.v3.z() - triangle.v2.z()) *
+				((y - triangle.v2.y()) / (triangle.v3.y() - triangle.v2.y())),
+		triangle.v1.z() + (triangle.v3.z() - triangle.v1.z()) *
+				((y - triangle.v1.y()) / (triangle.v3.y() - triangle.v1.y()))
+	};
+}
+
+std::tuple<QVector3D, QVector3D> ModelViewer::calculateFirstHalfNormalInterpolation(
+		PolygonTriangle &triangle, float y)
+{
+	QVector3D normal13 = triangle.vn1 + (y - triangle.v1.y()) *
+			(triangle.vn3 - triangle.vn1) / (triangle.v3.y() - triangle.v1.y());
+	QVector3D normal12 = triangle.vn1 + (y - triangle.v1.y()) *
+			(triangle.vn2 - triangle.vn1) / (triangle.v2.y() - triangle.v1.y());
+	return {
+		normal12, normal13
+	};
+}
+
+std::tuple<QVector3D, QVector3D> ModelViewer::calculateSecondHalfNormalInterpolation(
+		PolygonTriangle &triangle, float y)
+{
+	QVector3D normal13 = triangle.vn1 + (y - triangle.v1.y()) *
+			(triangle.vn3 - triangle.vn1) / (triangle.v3.y() - triangle.v1.y());
+	QVector3D normal23 = triangle.vn2 + (y - triangle.v2.y()) *
+			(triangle.vn3 - triangle.vn2) / (triangle.v3.y() - triangle.v2.y());
+	return {
+		normal23, normal13
+	};
+}
+
+std::tuple<QVector3D, QVector3D> ModelViewer::calculateFirstHalfWorldInterpolation(
+		PolygonTriangle &triangle, float y)
+{
+	QVector3D world13 = triangle.world1 + (y - triangle.v1.y()) *
+			(triangle.world3 - triangle.world1) / (triangle.v3.y() - triangle.v1.y());
+	QVector3D world12 = triangle.world1 + (y - triangle.v1.y()) *
+			(triangle.world2 - triangle.world1) / (triangle.v2.y() - triangle.v1.y());
+	return {
+		world12, world13
+	};
+}
+
+std::tuple<QVector3D, QVector3D> ModelViewer::calculateSecondHalfWorldInterpolation(
+		PolygonTriangle &triangle, float y)
+{
+	QVector3D world13 = triangle.world1 + (y - triangle.v1.y()) *
+			(triangle.world3 - triangle.world1) / (triangle.v3.y() - triangle.v1.y());
+	QVector3D world23 = triangle.world2 + (y - triangle.v2.y()) *
+			(triangle.world3 - triangle.world2) / (triangle.v3.y() - triangle.v2.y());
+	return {
+		world23, world13
+	};
+}
+/*
+std::tuple<TextureCoordinates, TextureCoordinates> ModelViewer::calculateFirstHalfTextureCoordinateInterpolation(
+			PolygonTriangle &triangle, float y)
+{
+	return {
+		triangle.vt1 + (y - triangle.v1.y()) *
+			(triangle.vt2 - triangle.vt1) / (triangle.v2.y() - triangle.v1.y()),
+		triangle.vt1 + (y - triangle.v1.y()) *
+			(triangle.vt3 - triangle.vt1) / (triangle.v3.y() - triangle.v1.y())
+	};
+}
+
+std::tuple<TextureCoordinates, TextureCoordinates> ModelViewer::calculateSecondHalfTextureCoordinateInterpolation(
+			PolygonTriangle &triangle, float y)
+{
+	return {
+		triangle.vt2 + (y - triangle.v2.y()) *
+			(triangle.vt3 - triangle.vt2) / (triangle.v3.y() - triangle.v2.y()),
+		triangle.vt1 + (y - triangle.v1.y()) *
+			(triangle.vt3 - triangle.vt1) / (triangle.v3.y() - triangle.v1.y())
+	};
+}
+*/
+QColor ModelViewer::getTriangleColor(
+			QVector3D &first, QVector3D &second, QVector3D &third, const QVector3D &light)
+{
+	auto polygonNormal = first + second + third;
+	polygonNormal.normalize();
+	auto intensity = QVector3D::dotProduct(polygonNormal, light);
+	return QColor(255 * intensity, 255 * intensity, 255 * intensity);
 }

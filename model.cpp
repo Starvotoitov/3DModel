@@ -2,6 +2,7 @@
 #include "matrixarithmetic.h"
 #include <cmath>
 #include <QtMath>
+#include <QRgb>
 
 Model::Model():
 	translateMatrix(MatrixArithmetic::identityMatrix()),
@@ -14,11 +15,14 @@ Model::Model():
 	projectionMatrix(MatrixArithmetic::identityMatrix()),
 	viewportMatrix(MatrixArithmetic::identityMatrix()),
 	isPerspective(false),
-	parameters(std::make_shared<ModelParameters>())
+	parameters(std::make_shared<ModelParameters>()),
+	normalMap(nullptr),
+	specularMap(nullptr),
+	albedoMap(nullptr)
 {
 }
 
-Model::Model(QString name):
+Model::Model(const QString& name, const QString& dir):
 	translateMatrix(MatrixArithmetic::identityMatrix()),
 	rotateXMatrix(MatrixArithmetic::identityMatrix()),
 	rotateYMatrix(MatrixArithmetic::identityMatrix()),
@@ -28,7 +32,10 @@ Model::Model(QString name):
 	projectionMatrix(MatrixArithmetic::identityMatrix()),
 	viewportMatrix(MatrixArithmetic::identityMatrix()),
 	isPerspective(false),
-	parameters(std::make_shared<ModelParameters>())
+	parameters(std::make_shared<ModelParameters>()),
+	normalMap(dir + "/Normal Map"),
+	specularMap(dir + "Specular Map"),
+	albedoMap(dir + "Albedo Map")
 {
 	parameters->setName(name);
 }
@@ -166,8 +173,8 @@ Model& Model::setPerspectiveProjectionMatrix(const Camera &camera)
 	float height = camera.getViewHeight();
 	float near = camera.getNearViewingPlane();
 	float far = camera.getFarViewingPlane();
+//	projectionMatrix = MatrixArithmetic::perspectiveMatrix(currentWidth, currentHeight, near, far);
 	projectionMatrix = MatrixArithmetic::perspectiveMatrix(width, height, near, far);
-
 	return *this;
 }
 
@@ -176,9 +183,9 @@ void Model::resetProjectionMatrix()
 	projectionMatrix = MatrixArithmetic::identityMatrix();
 }
 
-Model& Model::setViewportMatrix(float x, float y, float width, float height)
+Model& Model::setViewportMatrix(float x, float y)
 {
-	viewportMatrix = MatrixArithmetic::viewportMatrix(x, y, width, height);
+	viewportMatrix = MatrixArithmetic::viewportMatrix(x, y, currentWidth, currentHeight);
 
 	return *this;
 }
@@ -191,41 +198,118 @@ void Model::resetViewportMatrix()
 void Model::translateCoordinates()
 {
 	updateNormalizeViewMatrix();
-
-	QMatrix4x4 resultTranslateMatrix =
-			projectionMatrix * viewMatrix * normalizeViewMatrix * translateMatrix *
-			rotateXMatrix * rotateYMatrix * rotateZMatrix * scaleMatrix;
-
-	reset();
-	std::for_each(transformedVertexList.begin(), transformedVertexList.end(),
-	[this, &resultTranslateMatrix](Vertex& currentVertex){
-		currentVertex *= resultTranslateMatrix;
-		if (this->isPerspective)
+//	QMatrix4x4 resultTranslateMatrix = rotateXMatrix * rotateYMatrix * rotateZMatrix;
+	QMatrix4x4 resultTranslateMatrix = translateMatrix * rotateXMatrix * rotateYMatrix *
+			rotateZMatrix * scaleMatrix;
+	triangles.resize(polygonalFaceList.size());
+/*
+	for (int y = 0; y < normalMap.height(); ++y)
+	{
+		for (int x = 0; x < normalMap.width(); ++x)
 		{
-			currentVertex.normalizeW();
+			auto pixels = (QRgb*)normalMap.bits();
+
+			auto normalX = qRed(pixels[x + y * normalMap.width()]) / 255.0 * 2 - 1;
+			auto normalY = qGreen(pixels[x + y * normalMap.width()]) / 255.0 * 2 - 1;
+			auto normalZ = qBlue(pixels[x + y * normalMap.width()]) / 255.0 * 2 - 1;
+
+			QVector3D normal(normalX, normalY, normalZ);
+			normal = resultTranslateMatrix * normal;
+
+			pixels[x + y * normalMap.width()] = QColor(normal.x() * 255, normal.y() * 255, normal.z() * 255).rgb();
+
 		}
-		currentVertex *= this->viewportMatrix;
-	});
+	}
+*/
+	for (int i = 0; i < triangles.size(); ++i)
+	{
+		auto polygonVertexes = polygonalFaceList[i].getPolygonVertexList();
+
+		triangles[i].vn1 = resultTranslateMatrix * vertexNormalList[polygonVertexes[0].vertexNormalIndex - 1].toVector();
+		triangles[i].vn2 = resultTranslateMatrix * vertexNormalList[polygonVertexes[1].vertexNormalIndex - 1].toVector();
+		triangles[i].vn3 = resultTranslateMatrix * vertexNormalList[polygonVertexes[2].vertexNormalIndex - 1].toVector();
+
+		triangles[i].world1 = resultTranslateMatrix * originalVertexList[polygonVertexes[0].vertexIndex - 1].toVector3D();
+		triangles[i].world2 = resultTranslateMatrix * originalVertexList[polygonVertexes[1].vertexIndex - 1].toVector3D();
+		triangles[i].world3 = resultTranslateMatrix * originalVertexList[polygonVertexes[2].vertexIndex - 1].toVector3D();
+
+	}
+
+	resultTranslateMatrix = projectionMatrix * viewMatrix * normalizeViewMatrix * resultTranslateMatrix;
+
+	for (int i = 0; i < triangles.size(); ++i)
+	{
+		auto polygonVertexes = polygonalFaceList[i].getPolygonVertexList();
+		auto v1 = originalVertexList[polygonVertexes[0].vertexIndex - 1];
+		auto v2 = originalVertexList[polygonVertexes[1].vertexIndex - 1];
+		auto v3 = originalVertexList[polygonVertexes[2].vertexIndex - 1];
+		v1 *= resultTranslateMatrix;
+		v2 *= resultTranslateMatrix;
+		v3 *= resultTranslateMatrix;
+		if (isPerspective)
+		{
+			v1.normalizeW();
+			v2.normalizeW();
+			v3.normalizeW();
+		}
+		triangles[i].v1 = v1.toVector3D();
+		triangles[i].v2 = v2.toVector3D();
+		triangles[i].v3 = v3.toVector3D();
+	}
+
+	for (int i = 0; i < triangles.size(); ++i)
+	{
+		auto first = triangles[i].v2 - triangles[i].v1;
+		auto second = triangles[i].v3 - triangles[i].v1;
+		auto perpendicular = QVector3D::crossProduct(first, second);
+		triangles[i].isVisible = QVector3D::dotProduct(QVector3D(0, 0, 0) - this->camera->getVectorZ(), perpendicular) < 0;
+	}
+
+	for (int i = 0; i < triangles.size(); ++i)
+	{
+		triangles[i].v1 = viewportMatrix * triangles[i].v1;
+		triangles[i].v2 = viewportMatrix * triangles[i].v2;
+		triangles[i].v3 = viewportMatrix * triangles[i].v3;
+	}
+
+/*	for (int i = 0; i < triangles.size(); ++i)
+	{
+		auto polygonVertexes = polygonalFaceList[i].getPolygonVertexList();
+		triangles[i].vt1 = textureCoordinatesList[polygonVertexes[0].textureCoordinatesIndex - 1];
+		triangles[i].vt2 = textureCoordinatesList[polygonVertexes[1].textureCoordinatesIndex - 1];
+		triangles[i].vt3 = textureCoordinatesList[polygonVertexes[2].textureCoordinatesIndex - 1];
+	}*/
 }
 
-void Model::reset()
+const std::vector<PolygonTriangle>& Model::getPolygons() const
 {
-	transformedVertexList = originalVertexList;
+	return triangles;
 }
 
-std::vector<Vertex> Model::getVertexes() const
+const QImage& Model::getNormalMap() const
 {
-	return transformedVertexList;
+	return normalMap;
 }
 
-std::vector<PolygonalFace> Model::getPolygons() const
+const QImage& Model::getSpecularMap() const
 {
-	return polygonalFaceList;
+	return specularMap;
+}
+
+const QImage& Model::getAlbedoMap() const
+{
+	return albedoMap;
 }
 
 std::shared_ptr<const ModelParameters> Model::getParameters() const
 {
 	return parameters;
+}
+
+void Model::resize(float width, float height)
+{
+	currentWidth = width;
+	currentHeight = height;
 }
 
 void Model::updateNormalizeViewMatrix()

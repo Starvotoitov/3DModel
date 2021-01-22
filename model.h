@@ -7,14 +7,16 @@
 #include "polygonalface.h"
 #include "camera.h"
 #include "modelparameters.h"
+#include "polygontriangle.h"
 #include <vector>
 #include <memory>
+#include <QImage>
 
 class Model
 {
 public:
 	Model();
-	Model(QString name);
+	Model(const QString& name, const QString& dir);
 
 	void addVertex(const Vertex &newVertex);
 	void addVertex(Vertex &&newVertex);
@@ -39,16 +41,22 @@ public:
 	Model& setPerspectiveProjectionMatrix(const Camera& camera);
 	void resetProjectionMatrix();
 
-	Model& setViewportMatrix(float x, float y, float width, float height);
+	Model& setViewportMatrix(float x, float y);
 	void resetViewportMatrix();
 
 	void translateCoordinates();
-	void reset();
 
-	std::vector<Vertex> getVertexes() const;
-	std::vector<PolygonalFace> getPolygons() const;
+	void processTriangulation();
+
+	const std::vector<PolygonTriangle>& getPolygons() const;
+
+	const QImage& getNormalMap() const;
+	const QImage& getSpecularMap() const;
+	const QImage& getAlbedoMap() const;
 
 	std::shared_ptr<const ModelParameters> getParameters() const;
+
+	void resize(float width, float height);
 
 private:
 	std::shared_ptr<const Camera> camera;
@@ -58,7 +66,7 @@ private:
 	std::vector<VertexNormal> vertexNormalList;
 	std::vector<PolygonalFace> polygonalFaceList;
 
-	std::vector<Vertex> transformedVertexList;
+	std::vector<PolygonTriangle> triangles;
 
 	QMatrix4x4 translateMatrix;
 	QMatrix4x4 rotateXMatrix;
@@ -74,8 +82,12 @@ private:
 
 	std::shared_ptr<ModelParameters> parameters;
 
-	float curWidth;
-	float curHeight;
+	float currentWidth;
+	float currentHeight;
+
+	QImage normalMap;
+	QImage specularMap;
+	QImage albedoMap;
 
 	void updateNormalizeViewMatrix();
 };

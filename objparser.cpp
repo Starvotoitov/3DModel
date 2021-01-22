@@ -2,6 +2,9 @@
 #include <regex>
 #include <QTextStream>
 #include <QRegularExpression>
+#include <QFileInfo>
+#include <QDir>
+#include <qdebug.h>
 
 int ObjParser::line = 1;
 
@@ -30,13 +33,15 @@ void ObjParser::setObjFile(QString fileName)
 
 void ObjParser::parse()
 {
+	qDebug() << "Parse start";
 	if (!file.open(QFile::ReadOnly))
 	{
 		// ADD EXCEPTION
 		throw;
 	}
 
-	model = std::make_shared<Model>(file.fileName());
+	QFileInfo fileInfo(file);
+	model = std::make_shared<Model>(file.fileName(), fileInfo.dir().absolutePath());
 	QTextStream stream(&file);
 	QRegularExpression regEx("[^\\s]+");
 	while (!stream.atEnd())
@@ -56,6 +61,7 @@ void ObjParser::parse()
 			}
 		}
 	}
+	qDebug() << "Parse end";
 }
 
 std::shared_ptr<Model> ObjParser::getModel() const
@@ -108,6 +114,7 @@ void ObjParser::parsePolygonalFace(QRegularExpressionMatchIterator &matchs, std:
 	{
 		QString indexLine = matchs.next().captured();
 		QRegularExpressionMatch indexMatch = indexLineExpression.match(indexLine);
+
 		newFace.addPolygonVertex(PolygonVertex{
 									 indexMatch.captured(VERTEX).toInt(),
 									 indexMatch.captured(TEXTURE_COORDINATES).toInt(),

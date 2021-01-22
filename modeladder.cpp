@@ -4,10 +4,8 @@
 ModelAdder::ModelAdder(QWidget *parent):
 	QWidget(parent),
 	layout(new QVBoxLayout(this)),
-//	parseProgressBar(new QProgressBar(this)),
 	addButton(new QPushButton(ADD_BUTTON_CAPTION, this))
 {
-//	layout->addWidget(parseProgressBar);
 	layout->addWidget(addButton);
 	connect(addButton, &QPushButton::clicked, this, &ModelAdder::onModelChoosed);
 }

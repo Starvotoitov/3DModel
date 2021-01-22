@@ -6,6 +6,7 @@ ModelChooser::ModelChooser(QWidget *parent):
 	layout(new QHBoxLayout(this))
 {
 	bar->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+	bar->setMinimumHeight(30);
 	layout->addWidget(bar);
 	connect(bar, &QTabBar::currentChanged,
 			this, &ModelChooser::modelChoosed);
